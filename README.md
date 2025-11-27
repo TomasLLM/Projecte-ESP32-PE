@@ -9,7 +9,7 @@ Projecte de Projectes d'Enginyeria (curs 25-26) amb l'objectiu de connectar una 
 * **Oriol Jiménez:** Encarregat del firmware
 
 ### Hardware:
-* **ESP32**
+* **ESP32-S3**
 * Sensor GPS **NEO-6M**
 
 ****
@@ -17,5 +17,9 @@ Projecte de Projectes d'Enginyeria (curs 25-26) amb l'objectiu de connectar una 
 ## Informació sobre el hardware i datasheets
 blablabla
 
-* ### ESP32: No sé quin model específic té encara :(
-* ### NEO-6M: [Datasheet](https://content.u-blox.com/sites/default/files/products/documents/NEO-6_DataSheet_%28GPS.G6-HW-09005%29.pdf), [informació general online](https://components101.com/modules/neo-6mv2-gps-module)
+* ### ESP32-S3: [Dataheet](https://documentation.espressif.com/esp32-s3_datasheet_en.html).
+* ### NEO-6M: [Datasheet](https://content.u-blox.com/sites/default/files/products/documents/NEO-6_DataSheet_%28GPS.G6-HW-09005%29.pdf), [informació general online](https://components101.com/modules/neo-6mv2-gps-module).
+    * **Medeix:**
+        * Latitud i longitud
+        * Altitud
+        * Velocitat
