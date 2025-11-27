@@ -4,7 +4,7 @@
 
     Last modified: 27/11/2025
 */
-
+#include <HardwareSerial.h>
 
 // Define the RX and TX pins for Serial 2
 #define RXD2 16
