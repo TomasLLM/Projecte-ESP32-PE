@@ -18,4 +18,4 @@ Projecte de Projectes d'Enginyeria (curs 25-26) amb l'objectiu de connectar una 
 blablabla
 
 * ### ESP32: No sé quin model específic té encara :(
-* ### GY-GPS6MV2: [Datasheet](https://components101.com/modules/neo-6mv2-gps-module)
+* ### GY-GPS6MV2: [Datasheet](https://content.u-blox.com/sites/default/files/products/documents/NEO-6_DataSheet_%28GPS.G6-HW-09005%29.pdf), [informació online](https://components101.com/modules/neo-6mv2-gps-module)
