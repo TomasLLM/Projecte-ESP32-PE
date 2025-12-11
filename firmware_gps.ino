@@ -3,22 +3,24 @@
 #include "gps_data.h"
 
 bool gpsDataIsPlausible(const GpsData &d);
+bool sendNumericToSentilo(const char* sensorId, float value, const char* labelForLog);
 
 // ---------- CONFIG WIFI ----------
-const char* WIFI_SSID = "EL_TEU_SSID";
-const char* WIFI_PASS = "EL_TEU_PASSWORD";
+const char* WIFI_SSID = "POCO F3";
+const char* WIFI_PASS = "ProjectesE";
 
 // ---------- CONFIG SENTILO ----------
-const char* SENTILO_API_BASE = "http://147.83.83.21:8081";
+const char* SENTILO_API_BASE = "http://147.83.83.21:8080/sentilo-api";
 
 // Identificador del vostre provider
-const char* PROVIDER_ID = "gps_tracker_groupXY"; //MODIFICAR
-const char* SPEED_SENSOR_ID   = "gps_speed"; //MODIFICAR
-const char* POSITION_SENSOR_ID = "gps_position"; //MODIFICAR
-const char* ALTITUDE_SENSOR_ID    = "gps_altitude";   //MODIFICAR
+const char* PROVIDER_ID				= "grup_4-101@grup4_101_provider";	// MODIFICAR
+const char* SPEED_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Velocitat";				// MODIFICAR
+const char* LAT_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Latitud";				// MODIFICAR
+const char* LON_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Longitud";				// MODIFICAR
+const char* ALTITUDE_SENSOR_ID		= "grup_4-101@grup4_101_provider.GPS.Altitud";			// MODIFICAR
 
 // Token del provider (IDENTITY_KEY a Sentilo)
-const char* IDENTITY_KEY = "EL_TEU_TOKEN"; //MODIFICAR
+const char* IDENTITY_KEY = "83af41529fb19b634c61ca72379ccdf7dd58cb120fc75d806cabaa36565438dc"; //MODIFICAR
 
 const unsigned long SEND_PERIOD_MS = 2000; //2s
 unsigned long lastSendMillis = 0;
@@ -86,98 +88,28 @@ void connectWifi() {
 
 //Funció que envia la velocitat
 bool sendSpeedToSentilo(float speed) {
-	String url;
-	int httpCode;
-	HTTPClient http;
-
-	if (WiFi.status() != WL_CONNECTED) {
-		Serial.println("WiFi desconnectada. Reintentant connectar...");
-		connectWifi();
-		if (WiFi.status() != WL_CONNECTED) {
-			Serial.println("No s'ha pogut reconnectar a la WiFi.");
-			return false;
-		}
-	}
-	url = String(SENTILO_API_BASE) +
-				   "/data/" + PROVIDER_ID +
-				   "/" + SPEED_SENSOR_ID +
-				   "/" + String(speed, 2);
-	Serial.print("URL speed: ");
-	Serial.println(url);
-	http.begin(url);
-	http.addHeader("IDENTITY_KEY", IDENTITY_KEY);
-	httpCode = http.PUT("");
-	Serial.print("Resposta HTTP speed: ");
-	Serial.println(httpCode);
-	http.end();
-	return (httpCode == 200 || httpCode == 201);
+	return sendNumericToSentilo(SPEED_SENSOR_ID, speed, "speed");
 }
+
 
 // Funció que envia la posició com una observació amb JSON
-bool sendPositionToSentilo(float lat, float lon) {
-	HTTPClient http;
-	String url;
-	String body;
-	int httpCode;
-
-	if (WiFi.status() != WL_CONNECTED) {
-		Serial.println("WiFi desconnectada. Reintentant connectar...");
-		connectWifi();
-		if (WiFi.status() != WL_CONNECTED) {
-			Serial.println("No s'ha pogut reconnectar a la WiFi.");
-			return false;
-		}
-	}
-	url = String(SENTILO_API_BASE) +
-				   "/data/" + PROVIDER_ID +
-				   "/" + POSITION_SENSOR_ID;
-	Serial.print("URL position: ");
-	Serial.println(url);
-	http.begin(url);
-	http.addHeader("IDENTITY_KEY", IDENTITY_KEY);
-	http.addHeader("Content-Type", "application/json");
-	// De moment posem un value dummy, el que importa és la location
-	body = "{ \"observations\": [{"
-					"\"value\": \"1\", "
-					"\"location\": \"" + String(lat, 6) + " " + String(lon, 6) + "\""
-					"}] }";
-	Serial.print("Body position: ");
-	Serial.println(body);
-	httpCode = http.PUT(body);
-	Serial.print("Resposta HTTP position: ");
-	Serial.println(httpCode);
-	http.end();
-	return (httpCode == 200 || httpCode == 201);
+bool sendAltitudeToSentilo(float alt) {
+	return sendNumericToSentilo(ALTITUDE_SENSOR_ID, alt, "altitude");
 }
 
-
 // Funció que envia l'altitud com un valor simple
-bool sendAltitudeToSentilo(float alt) {
-	HTTPClient http;
-	String url;
-	int httpCode;
+bool sendLatitudeToSentilo(float lat) {
+	return sendNumericToSentilo(LAT_SENSOR_ID, lat, "lat");
+}
 
-	if (WiFi.status() != WL_CONNECTED) {
-		Serial.println("WiFi desconnectada. Reintentant connectar...");
-		connectWifi();
-		if (WiFi.status() != WL_CONNECTED) {
-			Serial.println("No s'ha pogut reconnectar a la WiFi.");
-			return false;
-		}
-	}
-	url = String(SENTILO_API_BASE) +
-		"/data/" + PROVIDER_ID +
-		"/" + ALTITUDE_SENSOR_ID +
-		"/" + String(alt, 2);
-	Serial.print("URL altitude: ");
-	Serial.println(url);
-	http.begin(url);
-	http.addHeader("IDENTITY_KEY", IDENTITY_KEY);
-	httpCode = http.PUT("");
-	Serial.print("Resposta HTTP altitude: ");
-	Serial.println(httpCode);
-	http.end();
-	return (httpCode == 200 || httpCode == 201);
+bool sendLongitudeToSentilo(float lon) {
+	return sendNumericToSentilo(LON_SENSOR_ID, lon, "lon");
+}
+
+bool sendPositionToSentilo(float lat, float lon) {
+	bool okLat = sendLatitudeToSentilo(lat);
+	bool okLon = sendLongitudeToSentilo(lon);
+	return (okLat && okLon);
 }
 
 GpsData getGpsData() {
@@ -203,4 +135,43 @@ bool gpsDataIsPlausible(const GpsData &d) {
 		return false;
 	}
 	return true;
+}
+
+bool sendNumericToSentilo(const char* sensorId, float value, const char* labelForLog) {
+	HTTPClient http;
+	String url;
+	int httpCode;
+
+	if (WiFi.status() != WL_CONNECTED) {
+		Serial.println("WiFi desconnectada. Reintentant connectar...");
+		connectWifi();
+		if (WiFi.status() != WL_CONNECTED) {
+			Serial.println("No s'ha pogut reconnectar a la WiFi.");
+			return false;
+		}
+	}
+
+	url = String(SENTILO_API_BASE) +
+		"/data/" + PROVIDER_ID +
+		"/" + sensorId +
+		"/" + String(value, 6);	// 6 decimals: bé per lat/lon
+
+	Serial.print("URL ");
+	Serial.print(labelForLog);
+	Serial.print(": ");
+	Serial.println(url);
+
+	http.begin(url);
+	http.addHeader("IDENTITY_KEY", IDENTITY_KEY);
+
+	httpCode = http.PUT("");
+
+	Serial.print("Resposta HTTP ");
+	Serial.print(labelForLog);
+	Serial.print(": ");
+	Serial.println(httpCode);
+
+	http.end();
+
+	return (httpCode == 200 || httpCode == 201);
 }
