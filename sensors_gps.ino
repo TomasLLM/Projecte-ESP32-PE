@@ -1,85 +1,78 @@
 #include <Arduino.h>
 #include "gps_data.h"
 
-// ---------------------------------------------------------------------------
-// CONFIGURACIÓ SERIAL DEL GPS
-// ---------------------------------------------------------------------------
-
 HardwareSerial gpsSerial(1);   // UART1: GPIO 16 (RX), GPIO 17 (TX)
 
 String nmeaBuffer = "";
-GpsData currentData;           // Estructura global amb l’última lectura vàlida
+GpsData currentData;
 
-
-// ---------------------------------------------------------------------------
-// EINA PER DIVIDIR CADENES
-// ---------------------------------------------------------------------------
-
-Vector<String> split(String s, char delimiter) {
-    Vector<String> result;
+// Funció per dividir cadenes en camps
+void splitNMEA(const String &s, char delimiter, String *out, int maxParts, int &outCount) {
+    outCount = 0;
     int start = 0;
-    for (int i = 0; i < s.length(); i++) {
+
+    for (int i = 0; i < s.length() && outCount < maxParts; i++) {
         if (s[i] == delimiter) {
-            result.push_back(s.substring(start, i));
+            out[outCount++] = s.substring(start, i);
             start = i + 1;
         }
     }
-    result.push_back(s.substring(start));
-    return result;
+    if (outCount < maxParts && start <= s.length()) {
+        out[outCount++] = s.substring(start);
+    }
 }
+  
 
-
-// ---------------------------------------------------------------------------
-// CONVERSIÓ DE COORDENADES NMEA A DECIMAL
-// Ex: "4807.038", "N" → 48.1173
-// ---------------------------------------------------------------------------
-
-float convertToDecimal(String value, String direction) {
-    if (value.length() < 3) return 0.0;
+static float convertToDecimal(const String &value, const String &direction) {
+    if (value.length() < 3) {
+        return 0.0f;
+    }
 
     float raw = value.toFloat();
-    int deg = int(raw / 100);
-    float minutes = raw - deg * 100;
+    int deg = int(raw / 100.0f);
+    float minutes = raw - deg * 100.0f;
 
-    float dec = deg + minutes / 60.0;
-    if (direction == "S" || direction == "W") dec = -dec;
+    float dec = deg + minutes / 60.0f;
+    if (direction == "S" || direction == "W") {
+        dec = -dec;
+    }
 
     return dec;
 }
 
+//Funcions per fer el parsing en el format que volem
+static void parseGGA(const String &s) {
+    const int MAX_PARTS = 20;
+    String parts[MAX_PARTS];
+    int count = 0;
 
-// ---------------------------------------------------------------------------
-// PARSEIG DE GGA: LAT, LON, ALT
-// ---------------------------------------------------------------------------
-
-void parseGGA(const String &s) {
-    auto parts = split(s, ',');
-    if (parts.size() < 10) return;
+    splitNMEA(s, ',', parts, MAX_PARTS, count);
+    if (count < 10) {
+        return;
+    }
 
     currentData.lat = convertToDecimal(parts[2], parts[3]);
     currentData.lon = convertToDecimal(parts[4], parts[5]);
-    currentData.alt = parts[9].toFloat();
+    currentData.alt = parts[9].toFloat();	// metres
 }
 
+static void parseRMC(const String &s) {
+    const int MAX_PARTS = 20;
+    String parts[MAX_PARTS];
+    int count = 0;
 
-// ---------------------------------------------------------------------------
-// PARSEIG DE RMC: VALIDACIÓ + VELOCITAT (knots)
-// ---------------------------------------------------------------------------
-
-void parseRMC(const String &s) {
-    auto parts = split(s, ',');
-    if (parts.size() < 8) return;
+    splitNMEA(s, ',', parts, MAX_PARTS, count);
+    if (count < 8) {
+        return;
+    }
 
     currentData.valid = (parts[2] == "A");
-    currentData.speed = parts[7].toFloat();  // en nusos
+
+    float speedKnots = parts[7].toFloat();
+    currentData.speed = speedKnots * 1.852f;//passem a km/h
 }
 
-
-// ---------------------------------------------------------------------------
-// GESTOR DE FRASES NMEA
-// ---------------------------------------------------------------------------
-
-void processNMEASentence(const String &s) {
+static void processNMEASentence(const String &s) {
     if (s.startsWith("$GPGGA")) {
         parseGGA(s);
     } else if (s.startsWith("$GPRMC")) {
@@ -87,41 +80,33 @@ void processNMEASentence(const String &s) {
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// SETUP
-// ---------------------------------------------------------------------------
-
-void setup() {
-    Serial.begin(115200);
+//Iniciem gps, la func es crida desde firmware
+void initGps() {
+    Serial.println("Inicialitzant GPS (UART1 16/17 @ 9600)...");
     gpsSerial.begin(9600, SERIAL_8N1, 16, 17);
 
-    Serial.println("Sensor GPS inicialitzat");
-    currentData = {0, 0, 0, 0, false};
+    currentData.lat   = 0.0f;
+    currentData.lon   = 0.0f;
+    currentData.alt   = 0.0f;
+    currentData.speed = 0.0f;
+    currentData.valid = false;
+    nmeaBuffer        = "";
 }
 
+//Actualitzem GPS
+void updateGps() {
+  while (gpsSerial.available()) {
+      char c = gpsSerial.read();
 
-// ---------------------------------------------------------------------------
-// LOOP PRINCIPAL: LLEGIR NMEA I PROCESSAR-LES
-// ---------------------------------------------------------------------------
-
-void loop() {
-    while (gpsSerial.available()) {
-        char c = gpsSerial.read();
-
-        if (c == '\n') {
-            processNMEASentence(nmeaBuffer);
-            nmeaBuffer = "";
-        } else if (c != '\r') {
-            nmeaBuffer += c;
-        }
-    }
+      if (c == '\n') {
+          processNMEASentence(nmeaBuffer);
+          nmeaBuffer = "";
+      } else if (c != '\r') {
+        nmeaBuffer += c;
+      }
+  }
 }
 
-
-// ---------------------------------------------------------------------------
-// FUNCIÓ EXPOSADA AL FIRMWARE: RETORNA LES DADES DEL GPS
-// ---------------------------------------------------------------------------
 
 GpsData getGpsData() {
     return currentData;

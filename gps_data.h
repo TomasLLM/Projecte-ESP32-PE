@@ -10,6 +10,9 @@ struct GpsData {
 	bool valid;
 };
 
-GpsData getGpsData();	// La Part 1 l'ha d'implementar
+GpsData getGpsData();
+
+void initGps();
+void updateGps();
 
 #endif
