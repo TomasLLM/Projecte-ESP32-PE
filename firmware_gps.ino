@@ -10,17 +10,17 @@ const char* WIFI_SSID = "POCO F3";
 const char* WIFI_PASS = "ProjectesE";
 
 // ---------- CONFIG SENTILO ----------
-const char* SENTILO_API_BASE = "http://147.83.83.21:8080/sentilo-api";
+const char* SENTILO_API_BASE = "http://147.83.83.21:8081";
 
 // Identificador del vostre provider
-const char* PROVIDER_ID				= "grup_4-101@grup4_101_provider";	// MODIFICAR
-const char* SPEED_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Velocitat";				// MODIFICAR
-const char* LAT_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Latitud";				// MODIFICAR
-const char* LON_SENSOR_ID			= "grup_4-101@grup4_101_provider.GPS.Longitud";				// MODIFICAR
-const char* ALTITUDE_SENSOR_ID		= "grup_4-101@grup4_101_provider.GPS.Altitud";			// MODIFICAR
+const char* PROVIDER_ID				= "grup_4-101@grup4_101_provider";
+const char* SPEED_SENSOR_ID     = "Velocitat";
+const char* LAT_SENSOR_ID       = "Latitud";
+const char* LON_SENSOR_ID       = "Longitud";
+const char* ALTITUDE_SENSOR_ID  = "Altitud";
 
 // Token del provider (IDENTITY_KEY a Sentilo)
-const char* IDENTITY_KEY = "83af41529fb19b634c61ca72379ccdf7dd58cb120fc75d806cabaa36565438dc"; //MODIFICAR
+const char* IDENTITY_KEY = "83af41529fb19b634c61ca72379ccdf7dd58cb120fc75d806cabaa36565438dc";
 
 const unsigned long SEND_PERIOD_MS = 2000; //2s
 unsigned long lastSendMillis = 0;
@@ -29,6 +29,18 @@ void connectWifi();
 bool sendSpeedToSentilo(float speed);
 bool sendPositionToSentilo(float lat, float lon);
 bool sendAltitudeToSentilo(float alt);
+
+GpsData getGpsData() {
+	GpsData d;
+
+	d.lat	= 41.3890f;
+	d.lon	= 2.1590f;
+	d.alt	= 50.0f;	// metres
+	d.speed	= 12.3f;	// km/h, per exemple
+	d.valid	= true;		// en la versió real vindrà de si el GPS té fix, etc.
+
+	return d;
+}
 
 void setup() {
 	Serial.begin(115200);
@@ -112,18 +124,6 @@ bool sendPositionToSentilo(float lat, float lon) {
 	return (okLat && okLon);
 }
 
-GpsData getGpsData() {
-	GpsData d;
-
-	d.lat	= 41.3890f;
-	d.lon	= 2.1590f;
-	d.alt	= 50.0f;	// metres
-	d.speed	= 12.3f;	// km/h, per exemple
-	d.valid	= true;		// en la versió real vindrà de si el GPS té fix, etc.
-
-	return d;
-}
-
 bool gpsDataIsPlausible(const GpsData &d) {
 	if (d.lat < -90.0f || d.lat > 90.0f) {
 		return false;
@@ -153,25 +153,32 @@ bool sendNumericToSentilo(const char* sensorId, float value, const char* labelFo
 
 	url = String(SENTILO_API_BASE) +
 		"/data/" + PROVIDER_ID +
-		"/" + sensorId +
-		"/" + String(value, 6);	// 6 decimals: bé per lat/lon
+		"/" + sensorId;
+
+	// JSON: {"observations":[{"value":"<valor>"}]}
+	String body = String("{\"observations\":[{\"value\":\"") +
+		String(value, 6) +
+		String("\"}]}");
 
 	Serial.print("URL ");
 	Serial.print(labelForLog);
 	Serial.print(": ");
 	Serial.println(url);
 
+	Serial.print("Body ");
+	Serial.print(labelForLog);
+	Serial.print(": ");
+	Serial.println(body);
+
 	http.begin(url);
 	http.addHeader("IDENTITY_KEY", IDENTITY_KEY);
+	http.addHeader("Content-Type", "application/json");
 
-	httpCode = http.PUT("");
-
+	httpCode = http.PUT(body);
 	Serial.print("Resposta HTTP ");
 	Serial.print(labelForLog);
 	Serial.print(": ");
 	Serial.println(httpCode);
-
 	http.end();
-
 	return (httpCode == 200 || httpCode == 201);
 }
