@@ -1,35 +1,128 @@
-/*
-    Example code to read data from a GPS module using Serial 2 on an ESP32.
-    The GPS module is connected to RX pin 16 and TX pin 17.
+#include <Arduino.h>
+#include "gps_data.h"
 
-    Last modified: 27/11/2025
-*/
-#include <HardwareSerial.h>
+// ---------------------------------------------------------------------------
+// CONFIGURACIÓ SERIAL DEL GPS
+// ---------------------------------------------------------------------------
 
-// Define the RX and TX pins for Serial 2
-#define RXD2 16
-#define TXD2 17
+HardwareSerial gpsSerial(1);   // UART1: GPIO 16 (RX), GPIO 17 (TX)
 
-#define GPS_BAUD 9600
+String nmeaBuffer = "";
+GpsData currentData;           // Estructura global amb l’última lectura vàlida
 
-// Create an instance of the HardwareSerial class for Serial 2
-HardwareSerial gpsSerial(2);
 
-void setup(){
-  // Serial Monitor
-  Serial.begin(115200);
-  
-  // Start Serial 2 with the defined RX and TX pins and a baud rate of 9600
-  gpsSerial.begin(GPS_BAUD, SERIAL_8N1, RXD2, TXD2);
-  Serial.println("Serial 2 started at 9600 baud rate");
+// ---------------------------------------------------------------------------
+// EINA PER DIVIDIR CADENES
+// ---------------------------------------------------------------------------
+
+Vector<String> split(String s, char delimiter) {
+    Vector<String> result;
+    int start = 0;
+    for (int i = 0; i < s.length(); i++) {
+        if (s[i] == delimiter) {
+            result.push_back(s.substring(start, i));
+            start = i + 1;
+        }
+    }
+    result.push_back(s.substring(start));
+    return result;
 }
 
-void loop(){
-  while (gpsSerial.available() > 0){
-    // get the byte data from the GPS
-    char gpsData = gpsSerial.read();
-    Serial.print(gpsData);
-  }
-  delay(1000);
-  Serial.println("-------------------------------");
+
+// ---------------------------------------------------------------------------
+// CONVERSIÓ DE COORDENADES NMEA A DECIMAL
+// Ex: "4807.038", "N" → 48.1173
+// ---------------------------------------------------------------------------
+
+float convertToDecimal(String value, String direction) {
+    if (value.length() < 3) return 0.0;
+
+    float raw = value.toFloat();
+    int deg = int(raw / 100);
+    float minutes = raw - deg * 100;
+
+    float dec = deg + minutes / 60.0;
+    if (direction == "S" || direction == "W") dec = -dec;
+
+    return dec;
+}
+
+
+// ---------------------------------------------------------------------------
+// PARSEIG DE GGA: LAT, LON, ALT
+// ---------------------------------------------------------------------------
+
+void parseGGA(const String &s) {
+    auto parts = split(s, ',');
+    if (parts.size() < 10) return;
+
+    currentData.lat = convertToDecimal(parts[2], parts[3]);
+    currentData.lon = convertToDecimal(parts[4], parts[5]);
+    currentData.alt = parts[9].toFloat();
+}
+
+
+// ---------------------------------------------------------------------------
+// PARSEIG DE RMC: VALIDACIÓ + VELOCITAT (knots)
+// ---------------------------------------------------------------------------
+
+void parseRMC(const String &s) {
+    auto parts = split(s, ',');
+    if (parts.size() < 8) return;
+
+    currentData.valid = (parts[2] == "A");
+    currentData.speed = parts[7].toFloat();  // en nusos
+}
+
+
+// ---------------------------------------------------------------------------
+// GESTOR DE FRASES NMEA
+// ---------------------------------------------------------------------------
+
+void processNMEASentence(const String &s) {
+    if (s.startsWith("$GPGGA")) {
+        parseGGA(s);
+    } else if (s.startsWith("$GPRMC")) {
+        parseRMC(s);
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// SETUP
+// ---------------------------------------------------------------------------
+
+void setup() {
+    Serial.begin(115200);
+    gpsSerial.begin(9600, SERIAL_8N1, 16, 17);
+
+    Serial.println("Sensor GPS inicialitzat");
+    currentData = {0, 0, 0, 0, false};
+}
+
+
+// ---------------------------------------------------------------------------
+// LOOP PRINCIPAL: LLEGIR NMEA I PROCESSAR-LES
+// ---------------------------------------------------------------------------
+
+void loop() {
+    while (gpsSerial.available()) {
+        char c = gpsSerial.read();
+
+        if (c == '\n') {
+            processNMEASentence(nmeaBuffer);
+            nmeaBuffer = "";
+        } else if (c != '\r') {
+            nmeaBuffer += c;
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// FUNCIÓ EXPOSADA AL FIRMWARE: RETORNA LES DADES DEL GPS
+// ---------------------------------------------------------------------------
+
+GpsData getGpsData() {
+    return currentData;
 }
