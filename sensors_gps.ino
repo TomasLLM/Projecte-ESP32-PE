@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <HardwareSerial.h>
 #include "gps_data.h"
 
 HardwareSerial gpsSerial(1);   // UART1: GPIO 16 (RX), GPIO 17 (TX)
