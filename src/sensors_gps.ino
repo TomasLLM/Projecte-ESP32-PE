@@ -74,11 +74,11 @@ static void parseRMC(const String &s) {
 }
 
 static void processNMEASentence(const String &s) {
-    if (s.startsWith("$GPGGA")) {
-        parseGGA(s);
-    } else if (s.startsWith("$GPRMC")) {
-        parseRMC(s);
-    }
+	if (s.startsWith("$GPGGA") || s.startsWith("$GNGGA")) {
+		parseGGA(s);
+	} else if (s.startsWith("$GPRMC") || s.startsWith("$GNRMC")) {
+		parseRMC(s);
+	}
 }
 
 //Iniciem gps, la func es crida desde firmware
@@ -98,6 +98,7 @@ void initGps() {
 void updateGps() {
   while (gpsSerial.available()) {
       char c = gpsSerial.read();
+      Serial.write(c);
 
       if (c == '\n') {
           processNMEASentence(nmeaBuffer);
