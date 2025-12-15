@@ -98,7 +98,6 @@ void initGps() {
 void updateGps() {
   while (gpsSerial.available()) {
       char c = gpsSerial.read();
-      Serial.write(c);
 
       if (c == '\n') {
           processNMEASentence(nmeaBuffer);
